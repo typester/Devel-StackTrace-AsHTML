@@ -7,6 +7,7 @@ our $VERSION = '0.03';
 use Data::Dumper;
 use Devel::StackTrace;
 use Scalar::Util;
+use File::Spec;
 
 sub encode_html {
     my $str = shift;
@@ -41,6 +42,7 @@ pre .match { color: #000;background-color: #f99; font-weight: bold }
 pre.vardump { margin:0 }
 pre code strong { color: #000; background: #f88; }
 .lexicals { display: none }
+a.line { color: #000; text-decoration: none; }
 STYLE
 
     if (ref $opt{style}) {
@@ -74,7 +76,7 @@ HEAD
             ' line ',
             $frame->line,
             q(<pre class="context"><code>),
-            _build_context($frame) || '',
+            _build_context($frame, $opt{editor}) || '',
             q(</code></pre>),
             $frame->can('lexicals') ? _build_lexicals($frame->lexicals, $i) : '',
             q(</li>),
@@ -116,7 +118,7 @@ sub _build_lexicals {
 }
 
 sub _build_context {
-    my $frame = shift;
+    my ($frame, $editor) = @_;
     my $file    = $frame->filename;
     my $linenum = $frame->line;
     my $code;
@@ -134,15 +136,25 @@ sub _build_context {
             $line =~ s|\t|        |g;
             my @tag = $cur_line == $linenum
                 ? (q{<strong class="match">}, '</strong>')
-                    : ('', '');
+                    : ('', '', '', '');
+            if ($editor) {
+                $tag[2] = sprintf '<a href="%s" class="line">',
+                    _build_editor_link($editor, File::Spec->rel2abs($file), $cur_line);
+                $tag[3] = '</a>';
+            }
             $code .= sprintf(
-                '%s%5d: %s%s', $tag[0], $cur_line, encode_html($line),
+                '%s%5d: %s%s%s%s', $tag[0], $cur_line, $tag[2], encode_html($line), $tag[3],
                 $tag[1],
             );
         }
         close $file;
     }
     return $code;
+}
+
+sub _build_editor_link {
+    my ($template, $file, $line) = @_;
+    sprintf $template, $file, $line;
 }
 
 1;
